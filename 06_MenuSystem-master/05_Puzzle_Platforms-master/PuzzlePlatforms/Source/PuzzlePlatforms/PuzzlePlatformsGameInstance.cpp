@@ -6,7 +6,6 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Blueprint/UserWidget.h"
 #include "OnlineSessionSettings.h"
-#include "OnlineSessionInterface.h"
 
 #include "MenuSystem/MainMenu.h"
 #include "MenuSystem/MenuWidget.h"
@@ -34,22 +33,17 @@ void UPuzzlePlatformsGameInstance::Init()
 	IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
 	if (Subsystem != nullptr)
 	{
-
 		UE_LOG(LogTemp, Warning, TEXT("Found subsystem %s"), *Subsystem->GetSubsystemName().ToString());
 		SessionInterface = Subsystem->GetSessionInterface();
 		if (SessionInterface.IsValid())
 		{
+			// moraju se pozvati delegati jer se radi o asinkronom dogadaju; npr. CreateSession samo pokrece proces kreiranja sesije dok se u pozadini nastavlja
+			// vrtiti program sto omogucava igranje igre u isto vrijeme dok se sesija ne kreira.
+			// MulticastDelegae (nije DynamicDelegate) ->nema potrebe za koristenjem UFUNCTIONS kao kod Dynamic
 			SessionInterface->OnCreateSessionCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnCreateSessionComplete);
 			SessionInterface->OnDestroySessionCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnDestroySessionComplete);
 			SessionInterface->OnFindSessionsCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnFindSessionsComplete);
-
-			SessionSearch = MakeShareable(new FOnlineSessionSearch());
-			if (SessionSearch.IsValid())
-			{
-				SessionSearch->bIsLanQuery = true;
-				UE_LOG(LogTemp, Warning, TEXT("Searching for sessions"));
-				SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());
-			}
+			SessionInterface->OnJoinSessionCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnJoinSessionComplete);
 		}
 	}
 	else
@@ -85,7 +79,8 @@ void UPuzzlePlatformsGameInstance::InGameLoadMenu()
 void UPuzzlePlatformsGameInstance::Host()
 {
 	if (SessionInterface.IsValid())
-	{
+	{	
+
 		auto ExistingSession = SessionInterface->GetNamedSession(SESSION_NAME);
 		if (ExistingSession != nullptr)
 		{
@@ -129,17 +124,34 @@ void UPuzzlePlatformsGameInstance::OnDestroySessionComplete(FName SessionName, b
 	}
 }
 
+void UPuzzlePlatformsGameInstance::RefreshServerList()
+{
+	SessionSearch = MakeShareable(new FOnlineSessionSearch());
+	if (SessionSearch.IsValid())
+	{
+		SessionSearch->bIsLanQuery = true;
+		UE_LOG(LogTemp, Warning, TEXT("Searching for sessions"));
+		SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());
+	}
+}
+
+
 void UPuzzlePlatformsGameInstance::OnFindSessionsComplete(bool Success)
 {
-	if (Success && SessionSearch.IsValid())
+	if (Success && SessionSearch.IsValid() && Menu != nullptr)
 	{
 		auto SearchResults = SessionSearch->SearchResults;
 		UE_LOG(LogTemp, Warning, TEXT("Finished Find Session"));
+
+		TArray<FString> ServerNames;
 		for (FOnlineSessionSearchResult& SearchResult : SearchResults)
 		{
 			FString SessionID = SearchResult.GetSessionIdStr();
 			UE_LOG(LogTemp, Warning, TEXT("Session ID: %s"), *SessionID);
+			ServerNames.Add(SessionID);
 		}
+
+		Menu->SetServerList(ServerNames);
 	}
 }
 
@@ -148,6 +160,7 @@ void UPuzzlePlatformsGameInstance::CreateSession()
 	if (SessionInterface.IsValid())
 	{
 		FOnlineSessionSettings SessionSettings;
+		// ove postavke trebaju biti inace nece pronaci niti jednu sesiju
 		SessionSettings.bIsLANMatch = true;
 		SessionSettings.NumPublicConnections = 2;
 		SessionSettings.bShouldAdvertise = true;
@@ -156,11 +169,29 @@ void UPuzzlePlatformsGameInstance::CreateSession()
 	}
 }
 
-void UPuzzlePlatformsGameInstance::Join(const FString& Address)
+
+void UPuzzlePlatformsGameInstance::Join(uint32 Index)
 {
+	if (!SessionInterface.IsValid()) return;
+	if (!SessionSearch.IsValid()) return;
+
 	if (Menu != nullptr)
 	{
 		Menu->Teardown();
+	}
+
+	SessionInterface->JoinSession(0, SESSION_NAME, SessionSearch->SearchResults[Index]);
+}
+
+void UPuzzlePlatformsGameInstance::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
+{
+	if (!SessionInterface.IsValid()) return;
+
+	FString Address;		// OUT param
+	if (!SessionInterface->GetResolvedConnectString(SessionName, Address))		// "za ovaj SessionName daj mi njegovu IP adresu"
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Could not get connect string"));
+		return;
 	}
 
 	UEngine* Engine = GetEngine();
@@ -195,7 +226,7 @@ void UPuzzlePlatformsGameInstance::LoadMainMenu()
 
 		PlayerController->ClientReturnToMainMenu("Back to main menu");
 	}
-
 }
+
 
 
