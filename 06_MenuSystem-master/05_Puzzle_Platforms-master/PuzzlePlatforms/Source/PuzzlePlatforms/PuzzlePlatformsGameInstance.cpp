@@ -129,7 +129,11 @@ void UPuzzlePlatformsGameInstance::RefreshServerList()
 	SessionSearch = MakeShareable(new FOnlineSessionSearch());
 	if (SessionSearch.IsValid())
 	{
-		SessionSearch->bIsLanQuery = true;
+		//SessionSearch->bIsLanQuery = true;
+		// posto shareamo APPID sa svima koji koriste besplatnu verziju, po defaultu se vraca jedan rezultat i taj rezultat vrlo vjerojatno nije nas. Zato se ovo postavi na velik broj
+		SessionSearch->MaxSearchResults = 100;
+		// ako se ne spajamo preko LAN-a onda moramo ovo namjestiti da se namjesti Search Presence
+		SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
 		UE_LOG(LogTemp, Warning, TEXT("Searching for sessions"));
 		SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());
 	}
@@ -161,9 +165,11 @@ void UPuzzlePlatformsGameInstance::CreateSession()
 	{
 		FOnlineSessionSettings SessionSettings;
 		// ove postavke trebaju biti inace nece pronaci niti jednu sesiju
-		SessionSettings.bIsLANMatch = true;
+		SessionSettings.bIsLANMatch = false;
 		SessionSettings.NumPublicConnections = 2;
 		SessionSettings.bShouldAdvertise = true;
+		// ako se ne spajamo preko LAN-a onda ovo mora biti true
+		SessionSettings.bUsesPresence = true;
 
 		SessionInterface->CreateSession(0, SESSION_NAME, SessionSettings);
 	}
