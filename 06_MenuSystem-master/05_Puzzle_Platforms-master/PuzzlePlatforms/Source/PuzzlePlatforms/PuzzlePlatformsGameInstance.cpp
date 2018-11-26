@@ -11,7 +11,7 @@
 #include "MenuSystem/MenuWidget.h"
 #include "PuzzlePlatformsGameMode.h"
 
-const static FName SESSION_NAME = TEXT("My Session Game");
+const static FName SESSION_NAME = NAME_GameSession;
 const static FName SERVER_NAME_SETTINGS_KEY = TEXT("ServerName");
 
 UPuzzlePlatformsGameInstance::UPuzzlePlatformsGameInstance(const FObjectInitializer & ObjectInitializer)
@@ -40,7 +40,7 @@ void UPuzzlePlatformsGameInstance::Init()
 		{
 			// moraju se pozvati delegati jer se radi o asinkronom dogadaju; npr. CreateSession samo pokrece proces kreiranja sesije dok se u pozadini nastavlja
 			// vrtiti program sto omogucava igranje igre u isto vrijeme dok se sesija ne kreira.
-			// MulticastDelegae (nije DynamicDelegate) ->nema potrebe za koristenjem UFUNCTIONS kao kod Dynamic
+			// MulticastDelegate (nije DynamicDelegate) ->nema potrebe za koristenjem UFUNCTIONS kao kod Dynamic
 			SessionInterface->OnCreateSessionCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnCreateSessionComplete);
 			SessionInterface->OnDestroySessionCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnDestroySessionComplete);
 			SessionInterface->OnFindSessionsCompleteDelegates.AddUObject(this, &UPuzzlePlatformsGameInstance::OnFindSessionsComplete);
@@ -109,7 +109,7 @@ void UPuzzlePlatformsGameInstance::CreateSession()
 		{
 			SessionSettings.bIsLANMatch = false;
 		}
-		SessionSettings.NumPublicConnections = 2;
+		SessionSettings.NumPublicConnections = 5;
 		SessionSettings.bShouldAdvertise = true;
 		// ako se ne spajamo preko LAN-a onda ovo mora biti true
 		SessionSettings.bUsesPresence = true;
@@ -185,7 +185,6 @@ void UPuzzlePlatformsGameInstance::OnFindSessionsComplete(bool Success)
 			Data.HostUsername = SearchResult.Session.OwningUserName;
 			Data.MaxPlayers = SearchResult.Session.SessionSettings.NumPublicConnections;
 			Data.CurrentPlayers = Data.MaxPlayers - SearchResult.Session.NumOpenPublicConnections;			// moramo oduzeti broj slobodnih konekcija od maksimalnog broja konekcija
-			Data.MaxPlayers = SearchResult.Session.SessionSettings.NumPublicConnections;
 			FString ServerName;
 			if (SearchResult.Session.SessionSettings.Get(SERVER_NAME_SETTINGS_KEY, ServerName))
 			{
@@ -236,6 +235,17 @@ void UPuzzlePlatformsGameInstance::OnJoinSessionComplete(FName SessionName, EOnJ
 
 	PlayerController->ClientTravel(*Address, ETravelType::TRAVEL_Absolute);
 }
+
+// pozivat ce se iz LobbyGameMode
+// StartSession kreira sesiju i onemogucava naknadna spajanja na tu konkretnu sesiju
+void UPuzzlePlatformsGameInstance::StartSession()
+{
+	if (SessionInterface.IsValid())
+	{
+		SessionInterface->StartSession(SESSION_NAME);
+	}
+}
+
 
 void UPuzzlePlatformsGameInstance::LoadMainMenu()
 {
