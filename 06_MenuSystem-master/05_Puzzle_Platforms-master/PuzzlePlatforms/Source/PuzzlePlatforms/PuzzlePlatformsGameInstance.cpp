@@ -12,6 +12,7 @@
 #include "PuzzlePlatformsGameMode.h"
 
 const static FName SESSION_NAME = TEXT("My Session Game");
+const static FName SERVER_NAME_SETTINGS_KEY = TEXT("ServerName");
 
 UPuzzlePlatformsGameInstance::UPuzzlePlatformsGameInstance(const FObjectInitializer & ObjectInitializer)
 {
@@ -76,8 +77,9 @@ void UPuzzlePlatformsGameInstance::InGameLoadMenu()
 	Menu->SetMenuInterface(this);
 }
 
-void UPuzzlePlatformsGameInstance::Host()
+void UPuzzlePlatformsGameInstance::Host(FString ServerName)
 {
+	DesiredServerName = ServerName;
 	if (SessionInterface.IsValid())
 	{	
 
@@ -90,6 +92,31 @@ void UPuzzlePlatformsGameInstance::Host()
 		{
 			CreateSession();
 		}
+	}
+}
+
+void UPuzzlePlatformsGameInstance::CreateSession()
+{
+	if (SessionInterface.IsValid())
+	{
+		// ove postavke trebaju biti inace nece pronaci niti jednu sesiju
+		FOnlineSessionSettings SessionSettings;
+		if (IOnlineSubsystem::Get()->GetSubsystemName() == "NULL")
+		{
+			SessionSettings.bIsLANMatch = true;
+		}
+		else
+		{
+			SessionSettings.bIsLANMatch = false;
+		}
+		SessionSettings.NumPublicConnections = 2;
+		SessionSettings.bShouldAdvertise = true;
+		// ako se ne spajamo preko LAN-a onda ovo mora biti true
+		SessionSettings.bUsesPresence = true;
+		// ovako mozemo postaviti custom settings. Key-value.
+		// Kod pronalaska sesija, sada ce i taj podatak biti dostupan za koristenje
+		SessionSettings.Set(SERVER_NAME_SETTINGS_KEY, DesiredServerName, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+		SessionInterface->CreateSession(0, SESSION_NAME, SessionSettings);
 	}
 }
 
@@ -113,7 +140,8 @@ void UPuzzlePlatformsGameInstance::OnCreateSessionComplete(FName SessionName, bo
 	UWorld* World = GetWorld();
 	if (!ensure(World != nullptr)) return;
 
-	World->ServerTravel("/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap?listen");
+	// napravi server travel u lobby
+	World->ServerTravel("/Game/PuzzlePlatforms/Maps/Lobby?listen");
 }
 
 void UPuzzlePlatformsGameInstance::OnDestroySessionComplete(FName SessionName, bool Success)
@@ -147,34 +175,32 @@ void UPuzzlePlatformsGameInstance::OnFindSessionsComplete(bool Success)
 		auto SearchResults = SessionSearch->SearchResults;
 		UE_LOG(LogTemp, Warning, TEXT("Finished Find Session"));
 
-		TArray<FString> ServerNames;
+		TArray<FServerData> ServerNames;
+
 		for (FOnlineSessionSearchResult& SearchResult : SearchResults)
 		{
-			FString SessionID = SearchResult.GetSessionIdStr();
-			UE_LOG(LogTemp, Warning, TEXT("Session ID: %s"), *SessionID);
-			ServerNames.Add(SessionID);
+			UE_LOG(LogTemp, Warning, TEXT("Session ID: %s"), *SearchResult.GetSessionIdStr());
+			FServerData Data;
+			
+			Data.HostUsername = SearchResult.Session.OwningUserName;
+			Data.MaxPlayers = SearchResult.Session.SessionSettings.NumPublicConnections;
+			Data.CurrentPlayers = Data.MaxPlayers - SearchResult.Session.NumOpenPublicConnections;			// moramo oduzeti broj slobodnih konekcija od maksimalnog broja konekcija
+			Data.MaxPlayers = SearchResult.Session.SessionSettings.NumPublicConnections;
+			FString ServerName;
+			if (SearchResult.Session.SessionSettings.Get(SERVER_NAME_SETTINGS_KEY, ServerName))
+			{
+				Data.Name = ServerName;
+			}
+			else
+			{
+				Data.Name = "Could not find server name";
+			}
+			ServerNames.Add(Data);
 		}
 
 		Menu->SetServerList(ServerNames);
 	}
 }
-
-void UPuzzlePlatformsGameInstance::CreateSession()
-{
-	if (SessionInterface.IsValid())
-	{
-		FOnlineSessionSettings SessionSettings;
-		// ove postavke trebaju biti inace nece pronaci niti jednu sesiju
-		SessionSettings.bIsLANMatch = false;
-		SessionSettings.NumPublicConnections = 2;
-		SessionSettings.bShouldAdvertise = true;
-		// ako se ne spajamo preko LAN-a onda ovo mora biti true
-		SessionSettings.bUsesPresence = true;
-
-		SessionInterface->CreateSession(0, SESSION_NAME, SessionSettings);
-	}
-}
-
 
 void UPuzzlePlatformsGameInstance::Join(uint32 Index)
 {

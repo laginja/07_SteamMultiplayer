@@ -6,6 +6,18 @@
 #include "MenuWidget.h"
 #include "MainMenu.generated.h"
 
+//USTRUCT() mora biti ako se struktura koristi u unrealu
+USTRUCT()
+struct FServerData
+{
+	GENERATED_BODY()
+
+	FString Name;
+	uint16 CurrentPlayers;
+	uint16 MaxPlayers;
+	FString HostUsername;
+};
+
 /**
  * 
  */
@@ -17,7 +29,7 @@ class PUZZLEPLATFORMS_API UMainMenu : public UMenuWidget
 public:
 	UMainMenu(const FObjectInitializer & ObjectInitializer);
 
-	void SetServerList(TArray<FString> ServerNames);
+	void SetServerList(TArray<FServerData> ServerNames);
 
 	void SelectIndex(uint32 Index);
 
@@ -37,6 +49,12 @@ private:
 	class UButton* QuitGameButton;
 
 	UPROPERTY(meta = (BindWidget))
+	class UButton* BackHostMenuButton;
+
+	UPROPERTY(meta = (BindWidget))
+	class UButton* ConfirmHostMenuButton;
+
+	UPROPERTY(meta = (BindWidget))
 	class UButton* BackJoinMenuButton;
 
 	UPROPERTY(meta = (BindWidget))
@@ -46,6 +64,9 @@ private:
 	class UWidgetSwitcher* MenuSwitcher;
 
 	UPROPERTY(meta = (BindWidget))
+	class UWidget* HostMenu;
+
+	UPROPERTY(meta = (BindWidget))
 	class UWidget* JoinMenu;
 
 	UPROPERTY(meta = (BindWidget))
@@ -53,6 +74,9 @@ private:
 
 	UPROPERTY(meta = (BindWidget))
 	class UPanelWidget* ServerList;
+
+	UPROPERTY(meta = (BindWidget))
+	class UEditableTextBox* GameName;
 
 	UFUNCTION()
 	void HostServer();
@@ -64,6 +88,9 @@ private:
 	void QuitGame();
 
 	UFUNCTION()
+	void OpenHostMenu();
+
+	UFUNCTION()
 	void OpenJoinMenu();
 
 	UFUNCTION()
@@ -71,4 +98,5 @@ private:
 
 	TOptional<uint32> SelectedIndex;
 
+	void UpdateChildren();
 };
