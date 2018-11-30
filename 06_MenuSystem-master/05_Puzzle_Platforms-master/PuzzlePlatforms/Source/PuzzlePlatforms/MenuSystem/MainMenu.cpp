@@ -100,6 +100,11 @@ void UMainMenu::UpdateChildren()
 	}
 }
 
+void UMainMenu::SetWarningMessage(FString WarningMessage)
+{
+	WarningText->SetText(FText::FromString(WarningMessage));
+}
+
 void UMainMenu::JoinServer()
 {
 	if (SelectedIndex.IsSet() && MenuInterface != nullptr)

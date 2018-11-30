@@ -176,28 +176,37 @@ void UPuzzlePlatformsGameInstance::OnFindSessionsComplete(bool Success)
 		UE_LOG(LogTemp, Warning, TEXT("Finished Find Session"));
 
 		TArray<FServerData> ServerNames;
-
-		for (FOnlineSessionSearchResult& SearchResult : SearchResults)
+		
+		if (SearchResults.Num() > 0)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Session ID: %s"), *SearchResult.GetSessionIdStr());
-			FServerData Data;
-			
-			Data.HostUsername = SearchResult.Session.OwningUserName;
-			Data.MaxPlayers = SearchResult.Session.SessionSettings.NumPublicConnections;
-			Data.CurrentPlayers = Data.MaxPlayers - SearchResult.Session.NumOpenPublicConnections;			// moramo oduzeti broj slobodnih konekcija od maksimalnog broja konekcija
-			FString ServerName;
-			if (SearchResult.Session.SessionSettings.Get(SERVER_NAME_SETTINGS_KEY, ServerName))
+			for (FOnlineSessionSearchResult& SearchResult : SearchResults)
 			{
-				Data.Name = ServerName;
-			}
-			else
-			{
-				Data.Name = "Could not find server name";
-			}
-			ServerNames.Add(Data);
-		}
+				UE_LOG(LogTemp, Warning, TEXT("Session ID: %s"), *SearchResult.GetSessionIdStr());
+				FServerData Data;
 
-		Menu->SetServerList(ServerNames);
+				Data.HostUsername = SearchResult.Session.OwningUserName;
+				Data.MaxPlayers = SearchResult.Session.SessionSettings.NumPublicConnections;
+				Data.CurrentPlayers = Data.MaxPlayers - SearchResult.Session.NumOpenPublicConnections;			// moramo oduzeti broj slobodnih konekcija od maksimalnog broja konekcija
+				FString ServerName;
+				if (SearchResult.Session.SessionSettings.Get(SERVER_NAME_SETTINGS_KEY, ServerName))
+				{
+					Data.Name = ServerName;
+				}
+				else
+				{
+					Data.Name = "Could not find server name";
+				}
+				ServerNames.Add(Data);
+			}
+
+			Menu->SetServerList(ServerNames);
+		}
+		else
+		{
+			FString WarningMessage = "No active sessions found";
+			Menu->SetWarningMessage(WarningMessage);
+			UE_LOG(LogTemp, Warning, TEXT("No active sessions found"));
+		}	
 	}
 }
 
@@ -238,6 +247,7 @@ void UPuzzlePlatformsGameInstance::OnJoinSessionComplete(FName SessionName, EOnJ
 
 // pozivat ce se iz LobbyGameMode
 // StartSession kreira sesiju i onemogucava naknadna spajanja na tu konkretnu sesiju
+// Postavlja status sesije "In Progress" stoga se nije moguce spojiti na nju
 void UPuzzlePlatformsGameInstance::StartSession()
 {
 	if (SessionInterface.IsValid())

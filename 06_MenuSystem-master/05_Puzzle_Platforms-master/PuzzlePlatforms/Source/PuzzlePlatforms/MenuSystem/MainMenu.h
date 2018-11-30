@@ -30,7 +30,7 @@ public:
 	UMainMenu(const FObjectInitializer & ObjectInitializer);
 
 	void SetServerList(TArray<FServerData> ServerNames);
-
+	void SetWarningMessage(FString WarningMessage);
 	void SelectIndex(uint32 Index);
 
 protected:
@@ -77,6 +77,9 @@ private:
 
 	UPROPERTY(meta = (BindWidget))
 	class UEditableTextBox* GameName;
+
+	UPROPERTY(meta = (BindWidget))
+	class UTextBlock* WarningText;
 
 	UFUNCTION()
 	void HostServer();
